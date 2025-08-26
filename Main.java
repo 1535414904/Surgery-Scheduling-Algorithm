@@ -189,7 +189,7 @@ public class Main {
 
                 System.out.println("=========================================================================");
 
-                System.out.printf("特殊手術房限制: %s\n", best.isSpecialRoomRequirementMet ? "✅ 符合" : "❌ 違反");
+                System.out.printf("特殊手術房限制: %s\n", best.isSpecialRoomRequirementMet ? "符合" : "違反");
 
                 System.out.println("\n詳細手術房使用情況 (排程後):");
                 System.out.println("-------------------------------------------------------");

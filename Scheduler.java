@@ -28,8 +28,7 @@ public class Scheduler {
 
     /**
      * 建構子，初始化排程器並從 DataManager 讀取所需參數
-     * 
-     * @param dataManager 資料管理器實例
+     * * @param dataManager 資料管理器實例
      */
     public Scheduler(DataManager dataManager) {
         this.dataManager = dataManager;
@@ -42,8 +41,7 @@ public class Scheduler {
 
     /**
      * 執行模擬退火演算法進行手術排程
-     * 
-     * @return 一個包含 "initial" (初始解) 和 "best" (最佳解) 的 Map
+     * * @return 一個包含 "initial" (初始解) 和 "best" (最佳解) 的 Map
      */
     public Map<String, Schedule> schedule() {
         List<SurgeryNode> surgeryNodes = dataManager.getSurgeryNodes();
@@ -70,6 +68,10 @@ public class Scheduler {
         // 4. 計算問題規模 n (手術數量 * 手術房數量)
         int n = surgeryNodes.size() * dataManager.getAllRooms().size();
 
+        // 新增：用於追蹤上一次的加班與超時時間
+        long lastRegularOvertime = -1;
+        long lastOvertime = -1;
+
         // 5. 模擬退火主要迴圈，直到溫度降至終止溫度
         while (currentTemperature > FINAL_TEMPERATURE) {
             // 根據問題規模計算在當前溫度下的迭代次數
@@ -94,6 +96,31 @@ public class Scheduler {
                     }
                 }
             }
+
+            // 新增：計算當前最佳解的指標
+            ScheduleMetrics currentBestMetrics = new ScheduleMetrics(bestSchedule, dataManager);
+            long currentRegularOvertime = currentBestMetrics.totalRegularOvertime;
+            long currentOvertime = currentBestMetrics.totalOvertime;
+
+            // 新增：如果不是第一次，就計算改善率並印出
+            if (lastRegularOvertime != -1) {
+                double regularOvertimeReduction = lastRegularOvertime > 0
+                        ? (1 - (double) currentRegularOvertime / lastRegularOvertime) * 100
+                        : 0;
+                double overtimeReduction = lastOvertime > 0 ? (1 - (double) currentOvertime / lastOvertime) * 100 : 0;
+
+                System.out.printf("溫度: %.2f -> 加班時間: %d (下降 %.2f%%), 超時時間: %d (下降 %.2f%%)\n",
+                        currentTemperature, currentRegularOvertime, regularOvertimeReduction,
+                        currentOvertime, overtimeReduction);
+            } else {
+                System.out.printf("溫度: %.2f -> 初始加班時間: %d, 初始超時時間: %d\n",
+                        currentTemperature, currentRegularOvertime, currentOvertime);
+            }
+
+            // 更新上一次的加班與超時時間
+            lastRegularOvertime = currentRegularOvertime;
+            lastOvertime = currentOvertime;
+
             // 根據冷卻策略降低溫度
             currentTemperature *= calculateCoolingRate(n);
         }
@@ -113,8 +140,8 @@ public class Scheduler {
     /**
      * 建立一個初始的排程方案
      * 策略：特殊手術房的手術優先分配到特殊房，其餘則平均分配到一般房
+     * * @param nodes 所有待排程的手術節點
      * 
-     * @param nodes 所有待排程的手術節點
      * @return 初始排程物件
      */
     private Schedule createInitialSchedule(List<SurgeryNode> nodes) {
@@ -152,8 +179,8 @@ public class Scheduler {
     /**
      * 計算排程的成本函數
      * 成本 = 總加班成本 + 總超時成本 (權重為2) + 各房間使用時間的平衡成本
+     * * @param schedule 待計算成本的排程
      * 
-     * @param schedule 待計算成本的排程
      * @return 計算出的總成本
      */
     private double calculateCost(Schedule schedule) {
@@ -203,8 +230,8 @@ public class Scheduler {
 
     /**
      * 檢查排程是否滿足所有限制 (例如：特殊手術是否在特殊房)
+     * * @param schedule 待檢查的排程
      * 
-     * @param schedule 待檢查的排程
      * @return 如果排程有效則回傳 true，否則 false
      */
     private boolean isValid(Schedule schedule) {
@@ -227,8 +254,8 @@ public class Scheduler {
     /**
      * 使用二分搜尋法找到適合的初始溫度
      * 目標是找到一個溫度，使得初始接受率約等於 INITIAL_ACCEPTANCE_RATE
+     * * @param initialSchedule 初始排程
      * 
-     * @param initialSchedule 初始排程
      * @return 計算出的初始溫度
      */
     private double findInitialTemperature(Schedule initialSchedule) {
@@ -247,8 +274,8 @@ public class Scheduler {
 
     /**
      * 在給定溫度下，計算鄰近解的接受率
+     * * @param schedule 目前排程
      * 
-     * @param schedule    目前排程
      * @param temperature 測試溫度
      * @return 接受率
      */
@@ -268,10 +295,10 @@ public class Scheduler {
 
     /**
      * 根據溫度階段對目前排程進行擾動，以產生鄰近解
+     * * @param currentSchedule 目前的排程
      * 
-     * @param currentSchedule 目前的排程
-     * @param temp            目前溫度
-     * @param initialTemp     初始溫度
+     * @param temp        目前溫度
+     * @param initialTemp 初始溫度
      * @return 一個新的、有效的鄰近排程
      */
     private Schedule perturbSchedule(Schedule currentSchedule, double temp, double initialTemp) {
@@ -309,8 +336,12 @@ public class Scheduler {
             // 高溫階段：移動手術時間最長的手術，進行大範圍擾動
             if (tNorm > TH) {
                 targetNode = Collections.max(list1, Comparator.comparingInt(SurgeryNode::getSurgeryTime));
+                // System.out.printf("高溫擾動 (%.2f): 移動最長手術 %s\n", tNorm,
+                // targetNode.getApplicationId());
             } else { // 中低溫階段：移動手術時間最短的手術，進行小範圍微調
                 targetNode = Collections.min(list1, Comparator.comparingInt(SurgeryNode::getSurgeryTime));
+                // System.out.printf("中低溫擾動 (%.2f): 移動最短手術 %s\n", tNorm,
+                // targetNode.getApplicationId());
             }
             list1.remove(targetNode);
 
@@ -340,8 +371,8 @@ public class Scheduler {
 
     /**
      * 根據問題規模計算自適應的冷卻係數
+     * * @param n 問題規模 (手術數量 * 房間數量)
      * 
-     * @param n 問題規模 (手術數量 * 房間數量)
      * @return 冷卻係數
      */
     private double calculateCoolingRate(int n) {
@@ -350,8 +381,7 @@ public class Scheduler {
 
     /**
      * 將最終的最佳排程結果更新回 DataManager
-     * 
-     * @param finalSchedule 最終的最佳排程
+     * * @param finalSchedule 最終的最佳排程
      */
     private void updateDataManagerWithSchedule(Schedule finalSchedule) {
         List<String[]> newTimetableData = new ArrayList<>();
